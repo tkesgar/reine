@@ -1,0 +1,12 @@
+language: node_js
+
+node_js:
+  - node
+  - "12"
+  - "14"
+
+script:
+  - npx @commitlint/travis-cli
+  - npm run build
+  - npm test -- --coverage
+  - npx codecov

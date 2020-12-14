@@ -1,0 +1,10 @@
+{
+  "javascript.format.enable": false,
+  "javascript.validate.enable": false,
+  "eslint.format.enable": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": true,
+    "source.organizeImports": true
+  }
+}
