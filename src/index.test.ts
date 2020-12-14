@@ -20,22 +20,15 @@ const ANYA_MELFISSA = {
   tags: ["#Anya_Melfissa", "#Melfriends", "#anyatelier"],
 };
 
-function createTestSWR<T>(swrFn: SwrFunction<T>, opts: Partial<SwrOpts> = {}) {
+function createTestSWR<T>(swrFn: SwrFunction<T>, opts: SwrOpts<T> = {}) {
   const fn = jest.fn(swrFn);
-  const errorHandler = jest.fn();
+  const swr = new SWR(fn, opts);
 
-  const swr = new SWR(fn, {
-    maxAge: 1000,
-    staleAge: 2000,
-    errorHandler,
-    ...opts,
-  });
-
-  return { swr, fn, errorHandler };
+  return { swr, fn };
 }
 
-function createDefaultTestSWR() {
-  return createTestSWR(async () => PAVOLIA_REINE);
+function createExampleTestSWR(opts: SwrOpts<typeof PAVOLIA_REINE> = {}) {
+  return createTestSWR(async () => PAVOLIA_REINE, opts);
 }
 
 beforeEach(() => {
@@ -45,12 +38,12 @@ beforeEach(() => {
 describe("SWR", () => {
   describe("age", () => {
     it("should return Infinity if data is never available before", () => {
-      const { swr } = createDefaultTestSWR();
+      const { swr } = createExampleTestSWR();
       expect(swr.age).toBe(Infinity);
     });
 
     it("should return correct data age", async () => {
-      const { swr } = createDefaultTestSWR();
+      const { swr } = createExampleTestSWR();
       await swr.get();
 
       jest.setSystemTime(15000);
@@ -61,7 +54,7 @@ describe("SWR", () => {
 
   describe("status", () => {
     it("should return 'fresh' if AGE = 0", async () => {
-      const { swr } = createDefaultTestSWR();
+      const { swr } = createExampleTestSWR();
       await swr.get();
 
       jest.setSystemTime(10000);
@@ -70,7 +63,7 @@ describe("SWR", () => {
     });
 
     it("should return 'fresh' if 0 < AGE < maxAge", async () => {
-      const { swr } = createDefaultTestSWR();
+      const { swr } = createExampleTestSWR();
       await swr.get();
 
       jest.setSystemTime(10500);
@@ -79,7 +72,7 @@ describe("SWR", () => {
     });
 
     it("should return 'stale' if AGE = maxAge", async () => {
-      const { swr } = createDefaultTestSWR();
+      const { swr } = createExampleTestSWR();
       await swr.get();
 
       jest.setSystemTime(11000);
@@ -88,7 +81,7 @@ describe("SWR", () => {
     });
 
     it("should return 'stale' if maxAge < AGE < staleAge", async () => {
-      const { swr } = createDefaultTestSWR();
+      const { swr } = createExampleTestSWR();
       await swr.get();
 
       jest.setSystemTime(11500);
@@ -97,7 +90,7 @@ describe("SWR", () => {
     });
 
     it("should return 'old' if AGE = staleAge", async () => {
-      const { swr } = createDefaultTestSWR();
+      const { swr } = createExampleTestSWR();
       await swr.get();
 
       jest.setSystemTime(12000);
@@ -106,7 +99,7 @@ describe("SWR", () => {
     });
 
     it("should return 'old' if staleAge < AGE", async () => {
-      const { swr } = createDefaultTestSWR();
+      const { swr } = createExampleTestSWR();
       await swr.get();
 
       jest.setSystemTime(12500);
@@ -115,7 +108,7 @@ describe("SWR", () => {
     });
 
     it("should return 'old' if AGE = Infinity", () => {
-      const { swr } = createDefaultTestSWR();
+      const { swr } = createExampleTestSWR();
 
       expect(swr.age).toBe(Infinity);
       expect(swr.status).toBe("old");
@@ -124,7 +117,7 @@ describe("SWR", () => {
 
   describe("get", () => {
     it("should return the value without executing the function if status is fresh", async () => {
-      const { swr, fn } = createDefaultTestSWR();
+      const { swr, fn } = createExampleTestSWR();
 
       await swr.get();
       expect(fn).toBeCalled();
@@ -137,7 +130,7 @@ describe("SWR", () => {
     });
 
     it("should return the old value and execute function if status is stale, then on next get immediately return value without execute function", async () => {
-      const { swr, fn } = createDefaultTestSWR();
+      const { swr, fn } = createExampleTestSWR();
 
       fn.mockImplementation(async () => ANYA_MELFISSA);
       const value1 = await swr.get();
@@ -163,7 +156,7 @@ describe("SWR", () => {
     });
 
     it("should execute function and return the value if status is old", async () => {
-      const { swr, fn } = createDefaultTestSWR();
+      const { swr, fn } = createExampleTestSWR();
 
       const value1 = await swr.get();
       expect(value1).toEqual(PAVOLIA_REINE);
@@ -177,7 +170,7 @@ describe("SWR", () => {
     });
 
     it("should throw error if get is called and status is old", async () => {
-      const { swr, fn } = createDefaultTestSWR();
+      const { swr, fn } = createExampleTestSWR();
 
       const value1 = await swr.get();
       expect(value1).toEqual(PAVOLIA_REINE);
@@ -192,8 +185,28 @@ describe("SWR", () => {
       expect(async () => swr.get()).rejects.toThrow("API request failed");
     });
 
-    it("should call errorHandler with error if get is called and status is stale", async () => {
-      const { swr, fn, errorHandler } = createDefaultTestSWR();
+    it("should silently ignore error if revalidateErrorHandler is not provided", async () => {
+      const { swr, fn } = createExampleTestSWR();
+
+      const value1 = await swr.get();
+      expect(value1).toEqual(PAVOLIA_REINE);
+
+      jest.setSystemTime(11500);
+      expect(swr.status).toBe("stale");
+
+      fn.mockImplementation(async () => {
+        throw new Error("API request failed");
+      });
+
+      const value2 = await swr.get();
+      await Promise.resolve();
+
+      expect(value2).toEqual(PAVOLIA_REINE);
+    });
+
+    it("should call revalidateErrorHandler with error if get is called and status is stale", async () => {
+      const revalidateErrorHandler = jest.fn();
+      const { swr, fn } = createExampleTestSWR({ revalidateErrorHandler });
 
       const value1 = await swr.get();
       expect(value1).toEqual(PAVOLIA_REINE);
@@ -210,11 +223,12 @@ describe("SWR", () => {
       await Promise.resolve();
 
       expect(value2).toEqual(PAVOLIA_REINE);
-      expect(errorHandler).toBeCalledWith(err);
+      expect(revalidateErrorHandler).toBeCalledWith(err);
     });
 
-    it("should not call errorHandler with error nor throw error if get is called and status is fresh", async () => {
-      const { swr, fn, errorHandler } = createDefaultTestSWR();
+    it("should not call revalidateErrorHandler with error nor throw error if get is called and status is fresh", async () => {
+      const revalidateErrorHandler = jest.fn();
+      const { swr, fn } = createExampleTestSWR({ revalidateErrorHandler });
 
       const value1 = await swr.get();
       expect(value1).toEqual(PAVOLIA_REINE);
@@ -231,7 +245,23 @@ describe("SWR", () => {
       await Promise.resolve();
 
       expect(value2).toEqual(PAVOLIA_REINE);
-      expect(errorHandler).not.toBeCalled();
+      expect(revalidateErrorHandler).not.toBeCalled();
+    });
+  });
+
+  describe("initialValue", () => {
+    it("should have status = fresh if initial value is provided", async () => {
+      const { swr } = createExampleTestSWR({ initialValue: PAVOLIA_REINE });
+
+      jest.setSystemTime(10500);
+      expect(swr.status).toBe("fresh");
+    });
+
+    it("should have status = old if initial value is not provided", async () => {
+      const { swr } = createExampleTestSWR();
+
+      jest.setSystemTime(10500);
+      expect(swr.status).toBe("old");
     });
   });
 });

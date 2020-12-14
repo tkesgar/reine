@@ -1,31 +1,42 @@
 export type SwrFunction<T> = () => Promise<T>;
 
-export type SwrErrorHandler = (err: unknown) => void;
+export type SwrRevalidateErrorHandler = (err: unknown) => void;
 
 export type SwrStatus = "fresh" | "stale" | "old";
 
-export interface SwrOpts {
-  maxAge: number;
-  staleAge: number;
-  errorHandler: SwrErrorHandler;
+export interface SwrOpts<T> {
+  initialValue?: T;
+  maxAge?: number;
+  staleAge?: number;
+  revalidateErrorHandler?: SwrRevalidateErrorHandler;
 }
 
 export class SWR<T> {
   readonly fn: SwrFunction<T>;
   readonly staleAge: number;
   readonly maxAge: number;
-  readonly errorHandler: SwrErrorHandler;
+  readonly revalidateErrorHandler: SwrRevalidateErrorHandler;
 
   private data: T;
   private lastRunTime = -Infinity;
 
-  constructor(fn: SwrFunction<T>, opts: SwrOpts) {
-    const { maxAge, staleAge, errorHandler } = opts;
+  constructor(fn: SwrFunction<T>, opts: SwrOpts<T>) {
+    const {
+      maxAge = 1000,
+      staleAge = 2000,
+      revalidateErrorHandler,
+      initialValue,
+    } = opts;
 
     this.fn = fn;
     this.maxAge = maxAge;
     this.staleAge = staleAge;
-    this.errorHandler = errorHandler;
+    this.revalidateErrorHandler = revalidateErrorHandler;
+
+    if (initialValue) {
+      this.data = initialValue;
+      this.lastRunTime = Date.now();
+    }
   }
 
   private async run(): Promise<void> {
@@ -55,7 +66,11 @@ export class SWR<T> {
         await this.run();
         break;
       case "stale":
-        this.run().catch(this.errorHandler);
+        this.run().catch((err) => {
+          if (this.revalidateErrorHandler) {
+            this.revalidateErrorHandler(err);
+          }
+        });
         break;
       default:
         break;
