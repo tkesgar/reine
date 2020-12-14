@@ -2,6 +2,8 @@ export type SwrFunction<T> = () => Promise<T>;
 
 export type SwrErrorHandler = (err: unknown) => void;
 
+export type SwrStatus = "fresh" | "stale" | "old";
+
 export interface SwrOpts {
   maxAge: number;
   staleAge: number;
@@ -15,7 +17,7 @@ export class SWR<T> {
   readonly errorHandler: SwrErrorHandler;
 
   private data: T;
-  private lastRunTime = Infinity;
+  private lastRunTime = -Infinity;
 
   constructor(fn: SwrFunction<T>, opts: SwrOpts) {
     const { maxAge, staleAge, errorHandler } = opts;
@@ -32,22 +34,31 @@ export class SWR<T> {
   }
 
   get age(): number {
-    return Math.max(0, Date.now() - this.lastRunTime);
+    return Date.now() - this.lastRunTime;
   }
 
-  get stale(): boolean {
-    return this.age > this.maxAge;
-  }
+  get status(): SwrStatus {
+    if (this.age < this.maxAge) {
+      return "fresh";
+    }
 
-  get old(): boolean {
-    return this.age > this.staleAge;
+    if (this.age < this.staleAge) {
+      return "stale";
+    }
+
+    return "old";
   }
 
   async get(): Promise<T> {
-    if (this.old) {
-      await this.run();
-    } else if (this.stale) {
-      this.run().catch(this.errorHandler);
+    switch (this.status) {
+      case "old":
+        await this.run();
+        break;
+      case "stale":
+        this.run().catch(this.errorHandler);
+        break;
+      default:
+        break;
     }
 
     return this.data;
