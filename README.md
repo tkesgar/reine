@@ -25,6 +25,10 @@ app.use(async () => {
   <img src="https://pbs.twimg.com/media/EoepYiwVQAAecTh?format=jpg" alt="Pavolia Reine by 飯田ぽち" width="400">
 </p>
 
+<p align="center">
+  <i>Pavolia Reine artwork by <a href="https://twitter.com/lizhi3">飯田ぽち</a></i>
+</p>
+
 ## Installation
 
 ```bash
