@@ -137,22 +137,22 @@ describe("SWR", () => {
     });
 
     it("should return the old value and execute function if status is stale, then on next get immediately return value without execute function", async () => {
-      const { swr, fn } = createTestSWR(async () => ANYA_MELFISSA);
+      const { swr, fn } = createDefaultTestSWR();
 
-      fn.mockImplementation(async () => PAVOLIA_REINE);
+      fn.mockImplementation(async () => ANYA_MELFISSA);
       const value1 = await swr.get();
 
       expect(fn).toBeCalledTimes(1);
-      expect(value1).toEqual(PAVOLIA_REINE);
+      expect(value1).toEqual(ANYA_MELFISSA);
 
       jest.setSystemTime(11500);
 
       fn.mockImplementation(async () => KUREIJI_OLLIE);
       const value2 = await swr.get();
-      jest.runAllTicks();
+      await Promise.resolve();
 
       expect(fn).toBeCalledTimes(2);
-      expect(value2).toEqual(PAVOLIA_REINE);
+      expect(value2).toEqual(ANYA_MELFISSA);
 
       jest.setSystemTime(12000);
 
@@ -162,10 +162,76 @@ describe("SWR", () => {
       expect(value3).toEqual(KUREIJI_OLLIE);
     });
 
-    it.todo("should execute function and return the value if status is old");
-    it.todo("should throw error if get is called and status is old");
-    it.todo(
-      "should call errorHandler with error if get is called and status is stale"
-    );
+    it("should execute function and return the value if status is old", async () => {
+      const { swr, fn } = createDefaultTestSWR();
+
+      const value1 = await swr.get();
+      expect(value1).toEqual(PAVOLIA_REINE);
+
+      jest.setSystemTime(15000);
+      expect(swr.status).toBe("old");
+
+      fn.mockImplementation(async () => ANYA_MELFISSA);
+      const value2 = await swr.get();
+      expect(value2).toEqual(ANYA_MELFISSA);
+    });
+
+    it("should throw error if get is called and status is old", async () => {
+      const { swr, fn } = createDefaultTestSWR();
+
+      const value1 = await swr.get();
+      expect(value1).toEqual(PAVOLIA_REINE);
+
+      jest.setSystemTime(15000);
+      expect(swr.status).toBe("old");
+
+      fn.mockImplementation(async () => {
+        throw new Error("API request failed");
+      });
+
+      expect(async () => swr.get()).rejects.toThrow("API request failed");
+    });
+
+    it("should call errorHandler with error if get is called and status is stale", async () => {
+      const { swr, fn, errorHandler } = createDefaultTestSWR();
+
+      const value1 = await swr.get();
+      expect(value1).toEqual(PAVOLIA_REINE);
+
+      jest.setSystemTime(11500);
+      expect(swr.status).toBe("stale");
+
+      const err = new Error("API request failed");
+      fn.mockImplementation(async () => {
+        throw err;
+      });
+
+      const value2 = await swr.get();
+      await Promise.resolve();
+
+      expect(value2).toEqual(PAVOLIA_REINE);
+      expect(errorHandler).toBeCalledWith(err);
+    });
+
+    it("should not call errorHandler with error nor throw error if get is called and status is fresh", async () => {
+      const { swr, fn, errorHandler } = createDefaultTestSWR();
+
+      const value1 = await swr.get();
+      expect(value1).toEqual(PAVOLIA_REINE);
+
+      jest.setSystemTime(10500);
+      expect(swr.status).toBe("fresh");
+
+      const err = new Error("API request failed");
+      fn.mockImplementation(async () => {
+        throw err;
+      });
+
+      const value2 = await swr.get();
+      await Promise.resolve();
+
+      expect(value2).toEqual(PAVOLIA_REINE);
+      expect(errorHandler).not.toBeCalled();
+    });
   });
 });
