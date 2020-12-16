@@ -310,4 +310,38 @@ describe("SWR", () => {
       expect(value2).toEqual(PAVOLIA_REINE);
     });
   });
+
+  describe("reset", () => {
+    it("should clear the current value and make the function to be called again", async () => {
+      const { swr, fn } = createExampleTestSWR();
+
+      await swr();
+
+      jest.setSystemTime(10500);
+      expect(swr.status).toBe("fresh");
+
+      swr.reset();
+      expect(swr.status).toBe("old");
+
+      await swr();
+      expect(fn).toBeCalledTimes(2);
+    });
+
+    it("should refreshes with the new value if a value is provided", async () => {
+      const { swr, fn } = createExampleTestSWR();
+
+      const value1 = await swr();
+      expect(value1).toBe(PAVOLIA_REINE);
+
+      jest.setSystemTime(10500);
+      expect(swr.status).toBe("fresh");
+
+      swr.reset(ANYA_MELFISSA);
+      expect(swr.status).toBe("fresh");
+
+      jest.setSystemTime(11000);
+      const value2 = await swr();
+      expect(value2).toBe(ANYA_MELFISSA);
+    });
+  });
 });

@@ -7,6 +7,7 @@ export type SwrStatus = "fresh" | "stale" | "old";
 type SwrWrappedFunction<T> = SwrFunction<T> & {
   readonly age: number;
   readonly status: SwrStatus;
+  reset(value?: T): void;
 };
 
 export interface SwrOpts<T> {
@@ -27,14 +28,18 @@ export default function createSWR<T>(
     initialValue,
   } = opts;
 
-  let data: T = initialValue;
-  let lastRunTime =
-    typeof initialValue === "undefined" ? -Infinity : Date.now();
+  let currentValue: T;
+  let lastRunTime: number;
 
-  const run = async () => {
-    data = await fn();
-    lastRunTime = Date.now();
+  const setValue = (
+    value?: T,
+    time: number = typeof value === "undefined" ? -Infinity : Date.now()
+  ) => {
+    currentValue = value;
+    lastRunTime = time;
   };
+
+  const run = async () => setValue(await fn());
 
   const getAge = () => Date.now() - lastRunTime;
 
@@ -69,17 +74,27 @@ export default function createSWR<T>(
         break;
     }
 
-    return data;
+    return currentValue;
   };
 
-  return Object.defineProperties(wrappedFn, {
-    age: {
-      get: getAge,
-      enumerable: true,
-    },
-    status: {
-      get: getStatus,
-      enumerable: true,
-    },
-  });
+  currentValue = initialValue;
+  lastRunTime = typeof initialValue === "undefined" ? -Infinity : Date.now();
+
+  return Object.assign(
+    Object.defineProperties(wrappedFn, {
+      age: {
+        get: getAge,
+        enumerable: true,
+      },
+      status: {
+        get: getStatus,
+        enumerable: true,
+      },
+    }),
+    {
+      reset(value?: T) {
+        setValue(value);
+      },
+    }
+  );
 }

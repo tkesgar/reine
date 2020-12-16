@@ -83,6 +83,14 @@ If the value is not available yet, the value will be `Infinity`.
 
 Returns the current state of value based on its age.
 
+### wrappedFn.reset([value])
+
+If no value is provided, sets the status to be "old", causing the next call to
+execute the function.
+
+If a value is provided, sets the current value to the provided value and
+refreshes the cache.
+
 ### wrappedFn(): Promise
 
 Retrieves the value for the function. Depending on the status:
@@ -101,10 +109,10 @@ Retrieves the value for the function. Depending on the status:
 ### Simple usage
 
 ```ts
-const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"));
+const fetchWinner = createSWR(() => fetchData("/api/user/winner/info"));
 
-const myInfo = await fetchMyInfo();
-console.log(await myInfo.username);
+const winner = await fetchWinner();
+console.log(await winner.username);
 ```
 
 ### Log revalidation errors
@@ -115,17 +123,14 @@ instance will return the stale value instead.
 It is recommended to provide an error handler to some logging mechanism.
 
 ```ts
-const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"), {
+const fetchWinner = createSWR(() => fetchData("/api/user/winner/info"), {
   revalidationErrorHandler(err) {
-    log.error(
-      { err },
-      "Failed to fetch winner info; using stale render result"
-    );
+    log.warn({ err }, "Failed to fetch winner info; using stale render result");
   },
 });
 
-const myInfo = await fetchMyInfo();
-console.log(await myInfo.username);
+const winner = await fetchWinner();
+console.log(await winner.username);
 ```
 
 ### Providing initial value
@@ -134,12 +139,12 @@ If an initial value is provided, the state will start as "fresh". This avoids
 the first call to be delayed.
 
 ```ts
-const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"), {
+const fetchWinner = createSWR(() => fetchData("/api/user/winner/info"), {
   initialValue: { id: 323, username: "pavolia_reine" },
 });
 
-const myInfo = await fetchMyInfo();
-console.log(await myInfo.username);
+const winner = await fetchWinner();
+console.log(await winner.username);
 ```
 
 ### Preload SWR instance
@@ -147,24 +152,24 @@ console.log(await myInfo.username);
 To avoid delays or errors for the first call, simply call the function first.
 
 ```ts
-const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"));
-await fetchMyInfo();
+const fetchWinner = createSWR(() => fetchData("/api/user/winner/info"));
+await fetchWinner();
 
-const myInfo = await fetchMyInfo();
-console.log(await myInfo.username);
+const winner = await fetchWinner();
+console.log(await winner.username);
 ```
 
 It is possible to make preload non-blocking; however, be aware that the future
 call will throw error if the function throws error again.
 
 ```ts
-const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"));
-fetchMyInfo().catch((err) => {
+const fetchWinner = createSWR(() => fetchData("/api/user/winner/info"));
+fetchWinner().catch((err) => {
   log.warn({ err }, "Failed to fetch winner info");
 });
 
-const myInfo = await fetchMyInfo();
-console.log(await myInfo.username);
+const winner = await fetchWinner();
+console.log(await winner.username);
 ```
 
 ### Always revalidate
@@ -175,14 +180,50 @@ instantly. This behaviour might be desirable if stale values are acceptable and
 revalidation is "cheap".
 
 ```ts
-const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"), {
+const fetchWinner = createSWR(() => fetchData("/api/user/winner/info"), {
   maxAge: 0,
   staleAge: Infinity,
 });
-await fetchMyInfo();
+await fetchWinner();
 
-const myInfo = await fetchMyInfo();
-console.log(await myInfo.username);
+const winner = await fetchWinner();
+console.log(await winner.username);
+```
+
+### Cache invalidation
+
+The cache can be invalidated for certain use cases, such as receiving an update
+event for the cached resource.
+
+```ts
+const fetchWinner = createSWR(() => fetchData("/api/user/winner/info"), {
+  revalidateErrorHandler(err) {
+    log.warn({ err }, "Failed to fetch winner data");
+  },
+});
+
+externalService.on("match-finished", () => {
+  fetchWinner.reset();
+});
+```
+
+To avoid delays, simply call the function after invalidating the cache.
+
+```ts
+externalService.on("match-finished", () => {
+  fetchWinner.reset();
+  fetchWinner().catch((err) => {
+    log.warn({ err }, "Failed to fetch winner data");
+  });
+});
+```
+
+Alternatively, it is also possible to set the current value.
+
+```ts
+externalService.on("match-finished", (result) => {
+  fetchWinner.reset(result.winner);
+});
 ```
 
 ## Questions
