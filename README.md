@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/tkesgar/reine.svg?branch=yagoo)](https://travis-ci.org/tkesgar/reine)
 [![codecov](https://codecov.io/gh/tkesgar/reine/branch/yagoo/graph/badge.svg)](https://codecov.io/gh/tkesgar/reine)
+[![npm bundle size](https://img.shields.io/bundlephobia/minzip/@tkesgar/reine)](https://bundlephobia.com/result?p=@tkesgar/reine)
+[![npm](https://img.shields.io/npm/dt/@tkesgar/reine)](https://www.npmjs.com/package/@tkesgar/reine)
 [![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](http://www.typescriptlang.org/)
 [![tested with jest](https://img.shields.io/badge/tested_with-jest-99424f.svg)](https://github.com/facebook/jest)
 
@@ -37,7 +39,7 @@ $ npm install @tkesgar/reine
 
 ## Usage
 
-The module exports a class `SWR`:
+The module exports a function `createSWR`.
 
 ```ts
 import createSWR from "@tkesgar/reine";
@@ -45,44 +47,45 @@ import createSWR from "@tkesgar/reine";
 
 ### createSWR<T>(asyncFn, opts = {})
 
-Wraps `asyncFn` using stale-while-revalidate strategy into a SWR instance
-object.
+Wraps `asyncFn` using stale-while-revalidate strategy into a new asynchronous
+function.
 
 Available options:
 
-- `maxAge` (default: `1000`): the minimum age in miliseconds for the value to be
-  considered stale.
-- `staleAge` (default: `2000`): the minimum age in miliseconds for the value to
-  be considered old.
-- `revalidateErrorHandler`: an error handler that will be called with the error
-  if `asyncFn` throws an error when trying to revalidate (i.e. value is style).
-- `initialValue`: if a value is provided, it will be used as initial value. The
-  SWR instance will always start at `fresh` state.
+- **maxAge** (default: `1000`): the minimum age in miliseconds for the value to
+  be considered stale.
+- **staleAge** (default: `2000`): the minimum age in miliseconds for the value
+  to be considered old.
+- **revalidateErrorHandler**: an error handler that will be called with the
+  error if `asyncFn` throws an error when trying to revalidate (i.e. value is
+  style).
+- **initialValue**: if a value is provided, it will be used as initial value.
+  The SWR instance will always start at `fresh` state.
 
 ```ts
-const swr = createSWR(fetchData, {
+const wrappedFetchData = createSWR(fetchData, {
   maxAge: 30000,
   staleAge: 60000,
   revalidateErrorHandler(err) {
     log.error({ err }, "Failed to fetch data from network; using stale data");
   },
+  initialValue: null,
 });
 ```
 
 ### wrappedFn.age: number
 
-Returns the age of value currently stored inside the SWR instance.
+Returns the age of current value.
 
-If the value is not available, it will be `Infinity`.
+If the value is not available yet, the value will be `Infinity`.
 
 ### wrappedFn.status: "fresh" | "stale" | "old"
 
 Returns the current state of value based on its age.
 
-### wrappedFn(): Promise<T>
+### wrappedFn(): Promise
 
-Retrieves the value for the function. Depending on the status of SWR instance,
-the function might be executed or not:
+Retrieves the value for the function. Depending on the status:
 
 - If status is **fresh**, the currently available data will be returned. The
   function will not be executed.
@@ -97,10 +100,6 @@ the function might be executed or not:
 
 ### Simple usage
 
-The simplest usage is to just pass a function. The value will be refreshed if
-the age is older than 1 second and will be retrieved again if the age is older
-than 2 seconds.
-
 ```ts
 const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"));
 
@@ -110,9 +109,10 @@ console.log(await myInfo.username);
 
 ### Log revalidation errors
 
-If there are no error handler is provided, **the error will be silently
-ignored**; the SWR instance will return the stale value instead. It is
-recommended to provide an error handler to some logging mechanism.
+If there is no error handler, _the error will be silently ignored_; the SWR
+instance will return the stale value instead.
+
+It is recommended to provide an error handler to some logging mechanism.
 
 ```ts
 const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"), {
@@ -130,7 +130,8 @@ console.log(await myInfo.username);
 
 ### Providing initial value
 
-If an initial value is available, it can be passed into the SWR instance:
+If an initial value is provided, the state will start as "fresh". This avoids
+the first call to be delayed.
 
 ```ts
 const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"), {
@@ -143,7 +144,7 @@ console.log(await myInfo.username);
 
 ### Preload SWR instance
 
-To avoid delays for the first call, simply call the function first.
+To avoid delays or errors for the first call, simply call the function first.
 
 ```ts
 const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"));
@@ -168,9 +169,9 @@ console.log(await myInfo.username);
 
 ### Always revalidate
 
-Setting `maxAge` to 0 and `staleAge` to Infinity will cause the SWR instance to
+Setting `maxAge` to `0` and `staleAge` to `Infinity` will cause the function to
 always revalidate the value on every calls, but returns the stale value
-instantly. This behaviour might be desirable if stale values are preferable and
+instantly. This behaviour might be desirable if stale values are acceptable and
 revalidation is "cheap".
 
 ```ts
