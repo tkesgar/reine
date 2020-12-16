@@ -23,6 +23,9 @@ app.use(async () => {
 });
 ```
 
+It is ~500 bytes gzipped, has no dependencies, and can be used in Node.js or
+browser environment.
+
 <p align="center">
   <img src="https://pbs.twimg.com/media/EoepYiwVQAAecTh?format=jpg" alt="Pavolia Reine by 飯田ぽち" width="400">
 </p>
