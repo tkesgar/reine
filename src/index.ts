@@ -28,7 +28,8 @@ export default function createSWR<T>(
   } = opts;
 
   let data: T = initialValue;
-  let lastRunTime = initialValue ? Date.now() : -Infinity;
+  let lastRunTime =
+    typeof initialValue === "undefined" ? -Infinity : Date.now();
 
   const run = async () => {
     data = await fn();
