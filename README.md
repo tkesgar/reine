@@ -8,12 +8,12 @@
 > Ketika ngirim foto cookies buat Moona-senpai terus dikira foto telur dadar...
 > 😭
 
-reine provides `SWR`, a simple in-memory caching helper based on the
-[stale-while-revalidate](https://web.dev/stale-while-revalidate/) strategy:
+reine provides `createSWR`, a simple in-memory caching helper based on the
+[stale-while-revalidate][swr]strategy:
 
 ```ts
 // Assume that renderToString takes 1000 ms
-const renderPage = new SWR(() => renderer.renderToString(app, ctx));
+const renderPage = createSWR(() => renderer.renderToString(app, ctx));
 
 app.use(async () => {
   const html = await renderPage();
@@ -40,10 +40,10 @@ $ npm install @tkesgar/reine
 The module exports a class `SWR`:
 
 ```ts
-import { SWR } from "@tkesgar/reine";
+import createSWR from "@tkesgar/reine";
 ```
 
-#### SWR<T>#constructor(asyncFn, opts = {})
+### createSWR<T>(asyncFn, opts = {})
 
 Wraps `asyncFn` using stale-while-revalidate strategy into a SWR instance
 object.
@@ -60,7 +60,7 @@ Available options:
   SWR instance will always start at `fresh` state.
 
 ```ts
-const swr = new SWR(fetchData, {
+const swr = createSWR(fetchData, {
   maxAge: 30000,
   staleAge: 60000,
   revalidateErrorHandler(err) {
@@ -69,17 +69,17 @@ const swr = new SWR(fetchData, {
 });
 ```
 
-#### SWR<T>.age: number
+### wrappedFn.age: number
 
 Returns the age of value currently stored inside the SWR instance.
 
 If the value is not available, it will be `Infinity`.
 
-#### SWR<T>.status: "fresh" | "stale" | "old"
+### wrappedFn.status: "fresh" | "stale" | "old"
 
 Returns the current state of value based on its age.
 
-#### async SWR<T>.get(): Promise<T>
+### wrappedFn(): Promise<T>
 
 Retrieves the value for the function. Depending on the status of SWR instance,
 the function might be executed or not:
@@ -91,7 +91,7 @@ the function might be executed or not:
   - If the function throws an error and `revalidateErrorHandler` is available,
     it will be called with the error value as argument.
 - If status is **old**, the function will be executed and the value is returned.
-  - If the function throws an error, `.get()` will throws the error.
+  - If the function throws an error, the function will throws the error.
 
 ## Recipes
 
@@ -102,9 +102,9 @@ the age is older than 1 second and will be retrieved again if the age is older
 than 2 seconds.
 
 ```ts
-const myInfoSwr = new SWR(() => fetchData("/api/user/winner/info"));
+const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"));
 
-const myInfo = await myInfoSwr.get();
+const myInfo = await fetchMyInfo();
 console.log(await myInfo.username);
 ```
 
@@ -115,7 +115,7 @@ ignored**; the SWR instance will return the stale value instead. It is
 recommended to provide an error handler to some logging mechanism.
 
 ```ts
-const myInfoSwr = new SWR(() => fetchData("/api/user/winner/info"), {
+const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"), {
   revalidationErrorHandler(err) {
     log.error(
       { err },
@@ -124,7 +124,7 @@ const myInfoSwr = new SWR(() => fetchData("/api/user/winner/info"), {
   },
 });
 
-const myInfo = await myInfoSwr.get();
+const myInfo = await fetchMyInfo();
 console.log(await myInfo.username);
 ```
 
@@ -133,54 +133,54 @@ console.log(await myInfo.username);
 If an initial value is available, it can be passed into the SWR instance:
 
 ```ts
-const myInfoSwr = new SWR(() => fetchData("/api/user/winner/info"), {
+const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"), {
   initialValue: { id: 323, username: "pavolia_reine" },
 });
 
-const myInfo = await myInfoSwr.get();
+const myInfo = await fetchMyInfo();
 console.log(await myInfo.username);
 ```
 
 ### Preload SWR instance
 
-To avoid delays for the first `.get()` call, simply call `.get()` first.
+To avoid delays for the first call, simply call the function first.
 
 ```ts
-const myInfoSwr = new SWR(() => fetchData("/api/user/winner/info"));
-await myInfo.get();
+const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"));
+await fetchMyInfo();
 
-const myInfo = await myInfoSwr.get();
+const myInfo = await fetchMyInfo();
 console.log(await myInfo.username);
 ```
 
 It is possible to make preload non-blocking; however, be aware that the future
-`.get()` call will throw error if the function throws error again.
+call will throw error if the function throws error again.
 
 ```ts
-const myInfoSwr = new SWR(() => fetchData("/api/user/winner/info"));
-myInfo.get().catch((err) => {
+const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"));
+fetchMyInfo().catch((err) => {
   log.warn({ err }, "Failed to fetch winner info");
 });
 
-const myInfo = await myInfoSwr.get();
+const myInfo = await fetchMyInfo();
 console.log(await myInfo.username);
 ```
 
 ### Always revalidate
 
 Setting `maxAge` to 0 and `staleAge` to Infinity will cause the SWR instance to
-always revalidate the value on every `.get()` calls, but returns the stale value
+always revalidate the value on every calls, but returns the stale value
 instantly. This behaviour might be desirable if stale values are preferable and
 revalidation is "cheap".
 
 ```ts
-const myInfoSwr = new SWR(() => fetchData("/api/user/winner/info"), {
+const fetchMyInfo = createSWR(() => fetchData("/api/user/winner/info"), {
   maxAge: 0,
   staleAge: Infinity,
 });
-await myInfoSwr.get();
+await fetchMyInfo();
 
-const myInfo = await myInfoSwr.get();
+const myInfo = await fetchMyInfo();
 console.log(await myInfo.username);
 ```
 
@@ -194,3 +194,4 @@ Licensed under MIT License.
 
 [issues]: https://github.com/tkesgar/reine/issues
 [pulls]: https://github.com/tkesgar/reine/pulls
+[swr]: https://web.dev/stale-while-revalidate/

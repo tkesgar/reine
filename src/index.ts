@@ -4,6 +4,11 @@ export type SwrRevalidateErrorHandler = (err: unknown) => void;
 
 export type SwrStatus = "fresh" | "stale" | "old";
 
+type SwrWrappedFunction<T> = SwrFunction<T> & {
+  readonly age: number;
+  readonly status: SwrStatus;
+};
+
 export interface SwrOpts<T> {
   initialValue?: T;
   maxAge?: number;
@@ -11,64 +16,51 @@ export interface SwrOpts<T> {
   revalidateErrorHandler?: SwrRevalidateErrorHandler;
 }
 
-export class SWR<T> {
-  readonly fn: SwrFunction<T>;
-  readonly staleAge: number;
-  readonly maxAge: number;
-  readonly revalidateErrorHandler: SwrRevalidateErrorHandler;
+export default function createSWR<T>(
+  fn: SwrFunction<T>,
+  opts: SwrOpts<T> = {}
+): SwrWrappedFunction<T> {
+  const {
+    maxAge = 1000,
+    staleAge = 2000,
+    revalidateErrorHandler,
+    initialValue,
+  } = opts;
 
-  private data: T;
-  private lastRunTime = -Infinity;
+  let data: T = initialValue;
+  let lastRunTime = initialValue ? Date.now() : -Infinity;
 
-  constructor(fn: SwrFunction<T>, opts: SwrOpts<T>) {
-    const {
-      maxAge = 1000,
-      staleAge = 2000,
-      revalidateErrorHandler,
-      initialValue,
-    } = opts;
+  const run = async () => {
+    data = await fn();
+    lastRunTime = Date.now();
+  };
 
-    this.fn = fn;
-    this.maxAge = maxAge;
-    this.staleAge = staleAge;
-    this.revalidateErrorHandler = revalidateErrorHandler;
+  const getAge = () => Date.now() - lastRunTime;
 
-    if (initialValue) {
-      this.data = initialValue;
-      this.lastRunTime = Date.now();
-    }
-  }
+  const getStatus = () => {
+    const age = getAge();
 
-  private async run(): Promise<void> {
-    this.data = await this.fn();
-    this.lastRunTime = Date.now();
-  }
-
-  get age(): number {
-    return Date.now() - this.lastRunTime;
-  }
-
-  get status(): SwrStatus {
-    if (this.age < this.maxAge) {
+    if (age < maxAge) {
       return "fresh";
     }
 
-    if (this.age < this.staleAge) {
+    if (age < staleAge) {
       return "stale";
     }
 
     return "old";
-  }
+  };
 
-  async get(): Promise<T> {
-    switch (this.status) {
+  const wrappedFn: SwrFunction<T> = async () => {
+    const status = getStatus();
+    switch (status) {
       case "old":
-        await this.run();
+        await run();
         break;
       case "stale":
-        this.run().catch((err) => {
-          if (this.revalidateErrorHandler) {
-            this.revalidateErrorHandler(err);
+        run().catch((err) => {
+          if (revalidateErrorHandler) {
+            revalidateErrorHandler(err);
           }
         });
         break;
@@ -76,6 +68,17 @@ export class SWR<T> {
         break;
     }
 
-    return this.data;
-  }
+    return data;
+  };
+
+  return Object.defineProperties(wrappedFn, {
+    age: {
+      get: getAge,
+      enumerable: true,
+    },
+    status: {
+      get: getStatus,
+      enumerable: true,
+    },
+  });
 }
