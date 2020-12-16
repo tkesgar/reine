@@ -185,6 +185,17 @@ const myInfo = await fetchMyInfo();
 console.log(await myInfo.username);
 ```
 
+## Questions
+
+### Does `createSWR` supports custom cache key/function arguments?
+
+No, `createSWR` call returns a single wrapped function that will be executed
+without arguments.
+
+### Does `createSWR` supports custom cache storage (e.g. Redis)?
+
+No, only in-memory.
+
 ## Contribute
 
 Feel free to [send issues][issues] or [create pull requests][pulls].
