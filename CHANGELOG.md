@@ -1,3 +1,5 @@
+## [0.2.1](https://github.com/tkesgar/reine/compare/v0.2.0...v0.2.1) (2020-12-16)
+
 # 0.2.0 (2020-12-16)
 
 ### Bug Fixes
