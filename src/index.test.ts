@@ -1,4 +1,4 @@
-import { SWR, SwrFunction, SwrOpts } from ".";
+import createSWR, { SwrFunction, SwrOpts } from ".";
 
 jest.useFakeTimers("modern");
 
@@ -22,7 +22,7 @@ const ANYA_MELFISSA = {
 
 function createTestSWR<T>(swrFn: SwrFunction<T>, opts: SwrOpts<T> = {}) {
   const fn = jest.fn(swrFn);
-  const swr = new SWR(fn, opts);
+  const swr = createSWR(fn, opts);
 
   return { swr, fn };
 }
@@ -44,7 +44,7 @@ describe("SWR", () => {
 
     it("should return correct data age", async () => {
       const { swr } = createExampleTestSWR();
-      await swr.get();
+      await swr();
 
       jest.setSystemTime(15000);
 
@@ -55,7 +55,7 @@ describe("SWR", () => {
   describe("status", () => {
     it("should return 'fresh' if AGE = 0", async () => {
       const { swr } = createExampleTestSWR();
-      await swr.get();
+      await swr();
 
       jest.setSystemTime(10000);
       expect(swr.age).toBe(0);
@@ -64,7 +64,7 @@ describe("SWR", () => {
 
     it("should return 'fresh' if 0 < AGE < maxAge", async () => {
       const { swr } = createExampleTestSWR();
-      await swr.get();
+      await swr();
 
       jest.setSystemTime(10500);
       expect(swr.age).toBe(500);
@@ -73,7 +73,7 @@ describe("SWR", () => {
 
     it("should return 'stale' if AGE = maxAge", async () => {
       const { swr } = createExampleTestSWR();
-      await swr.get();
+      await swr();
 
       jest.setSystemTime(11000);
       expect(swr.age).toBe(1000);
@@ -82,7 +82,7 @@ describe("SWR", () => {
 
     it("should return 'stale' if maxAge < AGE < staleAge", async () => {
       const { swr } = createExampleTestSWR();
-      await swr.get();
+      await swr();
 
       jest.setSystemTime(11500);
       expect(swr.age).toBe(1500);
@@ -91,7 +91,7 @@ describe("SWR", () => {
 
     it("should return 'old' if AGE = staleAge", async () => {
       const { swr } = createExampleTestSWR();
-      await swr.get();
+      await swr();
 
       jest.setSystemTime(12000);
       expect(swr.age).toBe(2000);
@@ -100,7 +100,7 @@ describe("SWR", () => {
 
     it("should return 'old' if staleAge < AGE", async () => {
       const { swr } = createExampleTestSWR();
-      await swr.get();
+      await swr();
 
       jest.setSystemTime(12500);
       expect(swr.age).toBe(2500);
@@ -119,13 +119,13 @@ describe("SWR", () => {
     it("should return the value without executing the function if status is fresh", async () => {
       const { swr, fn } = createExampleTestSWR();
 
-      await swr.get();
+      await swr();
       expect(fn).toBeCalled();
       fn.mockReset();
 
       jest.setSystemTime(10500);
 
-      await swr.get();
+      await swr();
       expect(fn).not.toBeCalled();
     });
 
@@ -133,7 +133,7 @@ describe("SWR", () => {
       const { swr, fn } = createExampleTestSWR();
 
       fn.mockImplementation(async () => ANYA_MELFISSA);
-      const value1 = await swr.get();
+      const value1 = await swr();
 
       expect(fn).toBeCalledTimes(1);
       expect(value1).toEqual(ANYA_MELFISSA);
@@ -141,7 +141,7 @@ describe("SWR", () => {
       jest.setSystemTime(11500);
 
       fn.mockImplementation(async () => KUREIJI_OLLIE);
-      const value2 = await swr.get();
+      const value2 = await swr();
       await Promise.resolve();
 
       expect(fn).toBeCalledTimes(2);
@@ -149,7 +149,7 @@ describe("SWR", () => {
 
       jest.setSystemTime(12000);
 
-      const value3 = await swr.get();
+      const value3 = await swr();
 
       expect(fn).toBeCalledTimes(2);
       expect(value3).toEqual(KUREIJI_OLLIE);
@@ -158,21 +158,21 @@ describe("SWR", () => {
     it("should execute function and return the value if status is old", async () => {
       const { swr, fn } = createExampleTestSWR();
 
-      const value1 = await swr.get();
+      const value1 = await swr();
       expect(value1).toEqual(PAVOLIA_REINE);
 
       jest.setSystemTime(15000);
       expect(swr.status).toBe("old");
 
       fn.mockImplementation(async () => ANYA_MELFISSA);
-      const value2 = await swr.get();
+      const value2 = await swr();
       expect(value2).toEqual(ANYA_MELFISSA);
     });
 
     it("should throw error if get is called and status is old", async () => {
       const { swr, fn } = createExampleTestSWR();
 
-      const value1 = await swr.get();
+      const value1 = await swr();
       expect(value1).toEqual(PAVOLIA_REINE);
 
       jest.setSystemTime(15000);
@@ -182,13 +182,13 @@ describe("SWR", () => {
         throw new Error("API request failed");
       });
 
-      expect(async () => swr.get()).rejects.toThrow("API request failed");
+      expect(async () => swr()).rejects.toThrow("API request failed");
     });
 
     it("should silently ignore error if revalidateErrorHandler is not provided", async () => {
       const { swr, fn } = createExampleTestSWR();
 
-      const value1 = await swr.get();
+      const value1 = await swr();
       expect(value1).toEqual(PAVOLIA_REINE);
 
       jest.setSystemTime(11500);
@@ -198,7 +198,7 @@ describe("SWR", () => {
         throw new Error("API request failed");
       });
 
-      const value2 = await swr.get();
+      const value2 = await swr();
       await Promise.resolve();
 
       expect(value2).toEqual(PAVOLIA_REINE);
@@ -208,7 +208,7 @@ describe("SWR", () => {
       const revalidateErrorHandler = jest.fn();
       const { swr, fn } = createExampleTestSWR({ revalidateErrorHandler });
 
-      const value1 = await swr.get();
+      const value1 = await swr();
       expect(value1).toEqual(PAVOLIA_REINE);
 
       jest.setSystemTime(11500);
@@ -219,7 +219,7 @@ describe("SWR", () => {
         throw err;
       });
 
-      const value2 = await swr.get();
+      const value2 = await swr();
       await Promise.resolve();
 
       expect(value2).toEqual(PAVOLIA_REINE);
@@ -230,7 +230,7 @@ describe("SWR", () => {
       const revalidateErrorHandler = jest.fn();
       const { swr, fn } = createExampleTestSWR({ revalidateErrorHandler });
 
-      const value1 = await swr.get();
+      const value1 = await swr();
       expect(value1).toEqual(PAVOLIA_REINE);
 
       jest.setSystemTime(10500);
@@ -241,7 +241,7 @@ describe("SWR", () => {
         throw err;
       });
 
-      const value2 = await swr.get();
+      const value2 = await swr();
       await Promise.resolve();
 
       expect(value2).toEqual(PAVOLIA_REINE);
@@ -262,6 +262,52 @@ describe("SWR", () => {
 
       jest.setSystemTime(10500);
       expect(swr.status).toBe("old");
+    });
+  });
+
+  describe("without opts", () => {
+    it("should work with default opts (maxAge = 1000, staleAge = 2000)", async () => {
+      const fn = jest.fn(async () => PAVOLIA_REINE);
+
+      const swr = createSWR(fn);
+      expect(swr.age).toBe(Infinity);
+      expect(swr.status).toBe("old");
+
+      jest.setSystemTime(10500);
+      await swr();
+      expect(fn).toBeCalled();
+
+      jest.setSystemTime(11000);
+      await swr();
+      expect(fn).toBeCalledTimes(1);
+
+      jest.setSystemTime(12500);
+      await swr();
+      await Promise.resolve();
+      expect(fn).toBeCalledTimes(2);
+
+      jest.setSystemTime(15000);
+      await swr();
+      expect(fn).toBeCalledTimes(3);
+    });
+
+    it("should not report error if called after 1500 ms", async () => {
+      const fn = jest.fn(async () => PAVOLIA_REINE);
+
+      const swr = createSWR(fn);
+
+      jest.setSystemTime(11000);
+      const value1 = await swr();
+
+      expect(fn).toBeCalled();
+      expect(value1).toEqual(PAVOLIA_REINE);
+
+      jest.setSystemTime(12500);
+      const value2 = await swr();
+      await Promise.resolve();
+
+      expect(fn).toBeCalledTimes(2);
+      expect(value2).toEqual(PAVOLIA_REINE);
     });
   });
 });
