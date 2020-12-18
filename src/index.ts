@@ -10,11 +10,36 @@ type SwrWrappedFunction<T> = SwrFunction<T> & {
   reset(value?: T): void;
 };
 
+export interface SwrStore<T> {
+  getValue(): T;
+  getTime(): number;
+  set(value: T, time: number): void;
+}
+
 export interface SwrOpts<T> {
   initialValue?: T;
   maxAge?: number;
   staleAge?: number;
+  store?: SwrStore<T>;
   revalidateErrorHandler?: SwrRevalidateErrorHandler;
+}
+
+export function createInMemoryStore<T>(): SwrStore<T> {
+  let value: T;
+  let time: number;
+
+  return {
+    getValue() {
+      return value;
+    },
+    getTime() {
+      return time;
+    },
+    set(newValue, newTime) {
+      value = newValue;
+      time = newTime;
+    },
+  };
 }
 
 export default function createSWR<T>(
@@ -24,24 +49,19 @@ export default function createSWR<T>(
   const {
     maxAge = 1000,
     staleAge = 2000,
+    store = createInMemoryStore<T>(),
     revalidateErrorHandler,
     initialValue,
   } = opts;
 
-  let currentValue: T;
-  let lastRunTime: number;
-
   const setValue = (
     value?: T,
     time: number = typeof value === "undefined" ? -Infinity : Date.now()
-  ) => {
-    currentValue = value;
-    lastRunTime = time;
-  };
+  ) => store.set(value, time);
 
   const run = async () => setValue(await fn());
 
-  const getAge = () => Date.now() - lastRunTime;
+  const getAge = () => Date.now() - store.getTime();
 
   const getStatus = () => {
     const age = getAge();
@@ -74,11 +94,13 @@ export default function createSWR<T>(
         break;
     }
 
-    return currentValue;
+    return store.getValue();
   };
 
-  currentValue = initialValue;
-  lastRunTime = typeof initialValue === "undefined" ? -Infinity : Date.now();
+  store.set(
+    initialValue,
+    typeof initialValue === "undefined" ? -Infinity : Date.now()
+  );
 
   return Object.assign(
     Object.defineProperties(wrappedFn, {
