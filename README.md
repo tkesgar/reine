@@ -11,13 +11,18 @@
 > 😭
 
 reine provides `createSWR`, a simple in-memory caching helper based on the
-[stale-while-revalidate][swr]strategy:
+[stale-while-revalidate][swr] strategy:
 
 ```ts
 // Assume that renderToString takes 1000 ms
 const renderPage = createSWR(() => renderer.renderToString(app, ctx));
 
+// Perform first rendering when preparing the server
+await renderPage();
+
+// Executed when the server receives requests
 app.use(async () => {
+  // Returns immediately as long as the content is not old
   const html = await renderPage();
   return html;
 });
